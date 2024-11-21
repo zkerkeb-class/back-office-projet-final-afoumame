@@ -10,3 +10,5 @@ node_modules
 coverage
 .next
 build
+*.js
+*.d.ts
