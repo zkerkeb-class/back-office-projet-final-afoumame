@@ -11,7 +11,6 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
-  useSidebar,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenu,
@@ -19,7 +18,7 @@ import {
   SidebarGroupLabel,
 } from '@/components/ui/sidebar';
 
-import { CircleGauge, ChartLine, CloudUpload, BookHeadphones, Settings } from 'lucide-react';
+import { CircleGauge, BookHeadphones, Settings } from 'lucide-react';
 import Link from 'next/link';
 
 // This is sample data.
@@ -36,19 +35,14 @@ const data = {
       href: '/dashboard',
     },
     {
-      title: 'KPIS',
-      icon: ChartLine,
-      href: '/kpis',
-    },
-    {
-      title: 'Upload',
-      icon: CloudUpload,
-      href: '/upload',
-    },
-    {
-      title: 'Catalog',
+      title: 'Albums',
       icon: BookHeadphones,
-      href: '/catalog',
+      href: '/albums',
+    },
+    {
+      title: 'Artists',
+      icon: BookHeadphones,
+      href: '/artists',
     },
     {
       title: 'Settings',
@@ -59,8 +53,6 @@ const data = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { isMobile } = useSidebar();
-
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
