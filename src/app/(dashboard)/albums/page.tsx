@@ -18,6 +18,7 @@ import {
   Trash,
   Search,
   CalendarIcon,
+  Loader2,
 } from 'lucide-react';
 import {
   Dialog,
@@ -120,6 +121,8 @@ function AlbumDetails({ album, artist, onClose }: AlbumDetailsProps) {
   const deleteAlbum = useDeleteAlbum();
 
   const handleAlbumEdit = async () => {
+    if (updateAlbum.isPending) return;
+
     try {
       await updateAlbum.mutateAsync({
         id: album.id,
@@ -161,7 +164,7 @@ function AlbumDetails({ album, artist, onClose }: AlbumDetailsProps) {
 
   const handleTrackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!trackForm.audio) return;
+    if (!trackForm.audio || createTrack.isPending) return;
 
     const formData = new FormData();
     formData.append('title', trackForm.title);
@@ -169,6 +172,7 @@ function AlbumDetails({ album, artist, onClose }: AlbumDetailsProps) {
     formData.append('artistId', trackForm.artistId);
     formData.append('albumId', album.id);
     formData.append('audio', trackForm.audio);
+    formData.append('isSingle', 'false');
 
     try {
       const newTrack = await createTrack.mutateAsync(formData);
@@ -205,6 +209,8 @@ function AlbumDetails({ album, artist, onClose }: AlbumDetailsProps) {
   };
 
   const handleDeleteAlbum = async () => {
+    if (deleteAlbum.isPending) return;
+
     if (confirm('Êtes-vous sûr de vouloir supprimer cet album ?')) {
       try {
         await deleteAlbum.mutateAsync(album.id);
@@ -221,11 +227,29 @@ function AlbumDetails({ album, artist, onClose }: AlbumDetailsProps) {
         <DialogTitle className="flex items-center justify-between">
           <span>Détails de l'album</span>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => setIsEditing(!isEditing)}>
-              <Pencil className="h-4 w-4" />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsEditing(!isEditing)}
+              disabled={updateAlbum.isPending || deleteAlbum.isPending}
+            >
+              {updateAlbum.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Pencil className="h-4 w-4" />
+              )}
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleDeleteAlbum}>
-              <Trash className="h-4 w-4 text-destructive" />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleDeleteAlbum}
+              disabled={updateAlbum.isPending || deleteAlbum.isPending}
+            >
+              {deleteAlbum.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin text-destructive" />
+              ) : (
+                <Trash className="h-4 w-4 text-destructive" />
+              )}
             </Button>
           </div>
         </DialogTitle>
@@ -265,7 +289,16 @@ function AlbumDetails({ album, artist, onClose }: AlbumDetailsProps) {
                   onChange={e => setEditedAlbum(prev => ({ ...prev, releaseDate: e.target.value }))}
                 />
               </div>
-              <Button onClick={handleAlbumEdit}>Enregistrer les modifications</Button>
+              <Button onClick={handleAlbumEdit} disabled={updateAlbum.isPending} className="mt-4">
+                {updateAlbum.isPending ? (
+                  <>
+                    <span className="mr-2">Enregistrement...</span>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  </>
+                ) : (
+                  'Enregistrer les modifications'
+                )}
+              </Button>
             </div>
           ) : (
             <div>
@@ -336,10 +369,24 @@ function AlbumDetails({ album, artist, onClose }: AlbumDetailsProps) {
                     />
                   </div>
                   <div className="flex justify-end gap-2">
-                    <Button type="button" variant="ghost" onClick={() => setShowAddTrack(false)}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setShowAddTrack(false)}
+                      disabled={createTrack.isPending}
+                    >
                       Annuler
                     </Button>
-                    <Button type="submit">Ajouter la piste</Button>
+                    <Button type="submit" disabled={createTrack.isPending}>
+                      {createTrack.isPending ? (
+                        <>
+                          <span className="mr-2">Ajout en cours...</span>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        </>
+                      ) : (
+                        'Ajouter la piste'
+                      )}
+                    </Button>
                   </div>
                 </>
               )}
@@ -402,6 +449,7 @@ function AlbumDetails({ album, artist, onClose }: AlbumDetailsProps) {
 export default function AlbumsPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [formData, setFormData] = useState<CreateAlbumForm>({
     title: '',
@@ -419,6 +467,20 @@ export default function AlbumsPage() {
   const { data: searchResults, isLoading: isSearching } = useSearchAlbums(searchParams);
   const { data: artists, isLoading: isLoadingArtists } = useArtists();
   const createAlbum = useCreateAlbum();
+
+  // Récupérer le paramètre selected de l'URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const selectedId = urlParams.get('selected');
+
+    if (selectedId && albums) {
+      const album = albums.find(a => a.id === selectedId);
+      if (album) {
+        setSelectedAlbum(album);
+        setDialogOpen(true);
+      }
+    }
+  }, [albums]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, files } = e.target;
@@ -451,6 +513,7 @@ export default function AlbumsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (createAlbum.isPending) return;
 
     const submitData = new FormData();
     submitData.append('title', formData.title);
@@ -680,9 +743,26 @@ export default function AlbumsPage() {
                     </div>
                   </div>
                 </div>
-                <Button type="submit" className="w-full">
-                  Créer l'album
-                </Button>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setCreateModalOpen(false)}
+                    disabled={createAlbum.isPending}
+                  >
+                    Annuler
+                  </Button>
+                  <Button type="submit" disabled={createAlbum.isPending}>
+                    {createAlbum.isPending ? (
+                      <>
+                        <span className="mr-2">Création en cours...</span>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      </>
+                    ) : (
+                      "Créer l'album"
+                    )}
+                  </Button>
+                </div>
               </form>
             </DialogContent>
           </Dialog>
@@ -690,9 +770,22 @@ export default function AlbumsPage() {
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {(searchResults || albums)?.map(album => (
-          <Dialog key={album.id} onOpenChange={open => open && setSelectedAlbum(album)}>
+          <Dialog
+            key={album.id}
+            open={dialogOpen && selectedAlbum?.id === album.id}
+            onOpenChange={open => {
+              setDialogOpen(open);
+              if (!open) setSelectedAlbum(null);
+            }}
+          >
             <DialogTrigger asChild>
-              <Card className="overflow-hidden transition-all hover:shadow-lg cursor-pointer">
+              <Card
+                className="overflow-hidden transition-all hover:shadow-lg cursor-pointer"
+                onClick={() => {
+                  setSelectedAlbum(album);
+                  setDialogOpen(true);
+                }}
+              >
                 <CardHeader className="p-0">
                   <div className="relative aspect-square w-full">
                     {album.coverUrl ? (
@@ -722,7 +815,10 @@ export default function AlbumsPage() {
               <AlbumDetails
                 album={album}
                 artist={artists.find(a => a.id === album.artistId)}
-                onClose={() => setSelectedAlbum(null)}
+                onClose={() => {
+                  setDialogOpen(false);
+                  setSelectedAlbum(null);
+                }}
               />
             )}
           </Dialog>

@@ -3,6 +3,10 @@ import { Artist, CreateArtistInput, UpdateArtistInput } from '@/types/Artist';
 
 const ARTISTS_QUERY_KEY = ['artists'];
 
+export interface SearchArtistParams {
+  name?: string;
+}
+
 export function useArtists() {
   return useQuery({
     queryKey: ARTISTS_QUERY_KEY,
@@ -13,6 +17,23 @@ export function useArtists() {
       }
       return response.json() as Promise<Artist[]>;
     },
+  });
+}
+
+export function useSearchArtists(params: SearchArtistParams) {
+  return useQuery({
+    queryKey: ['artists', 'search', params],
+    queryFn: async () => {
+      const searchParams = new URLSearchParams();
+      if (params.name) searchParams.append('name', params.name);
+
+      const response = await fetch(`http://localhost:8080/api/artists/search?${searchParams}`);
+      if (!response.ok) {
+        throw new Error('Erreur lors de la recherche des artistes');
+      }
+      return response.json() as Promise<Artist[]>;
+    },
+    enabled: Object.values(params).some(value => value !== undefined),
   });
 }
 

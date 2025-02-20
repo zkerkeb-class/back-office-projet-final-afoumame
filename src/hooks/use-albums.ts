@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Album, UpdateAlbumInput, SearchAlbumParams } from '@/types/Album';
 
 const ALBUMS_QUERY_KEY = ['albums'];
-
+const ARTISTS_QUERY_KEY = ['artists'];
 export function useAlbums() {
   return useQuery({
     queryKey: ALBUMS_QUERY_KEY,
@@ -32,6 +32,7 @@ export function useCreateAlbum() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ALBUMS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ARTISTS_QUERY_KEY });
     },
   });
 }

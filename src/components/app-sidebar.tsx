@@ -18,7 +18,7 @@ import {
   SidebarGroupLabel,
 } from '@/components/ui/sidebar';
 
-import { CircleGauge, BookHeadphones, Settings } from 'lucide-react';
+import { CircleGauge, BookHeadphones, Settings, Music } from 'lucide-react';
 import Link from 'next/link';
 
 // This is sample data.
@@ -30,7 +30,7 @@ const data = {
   },
   menu: [
     {
-      title: 'Dashboard',
+      title: 'Tableau de bord',
       icon: CircleGauge,
       href: '/dashboard',
     },
@@ -40,12 +40,17 @@ const data = {
       href: '/albums',
     },
     {
-      title: 'Artists',
+      title: 'Artistes',
       icon: BookHeadphones,
       href: '/artists',
     },
     {
-      title: 'Settings',
+      title: 'Pistes',
+      icon: Music,
+      href: '/tracks',
+    },
+    {
+      title: 'Paramètres',
       icon: Settings,
       href: '/settings',
     },

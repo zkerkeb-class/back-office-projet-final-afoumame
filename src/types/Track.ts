@@ -3,23 +3,27 @@ export interface Track {
   title: string;
   duration: number;
   audioUrl: string;
+  coverUrl: string | null;
   albumId: string | null;
   artistId: string;
+  isSingle: boolean;
 }
 
 export interface CreateTrackInput {
   title: string;
   duration: number;
   audioUrl: string;
+  coverUrl?: string | null;
   albumId?: string;
   artistId: string;
-  isSingle?: boolean;
+  isSingle: boolean;
 }
 
 export interface UpdateTrackInput {
   title?: string;
   duration?: number;
   audioUrl?: string;
+  coverUrl?: string | null;
   albumId?: string | null;
   artistId?: string;
   isSingle?: boolean;

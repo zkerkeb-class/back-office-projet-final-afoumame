@@ -7,7 +7,18 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Plus, Upload, User, Music, Pencil, Trash, Calendar, Clock } from 'lucide-react';
+import {
+  Plus,
+  Upload,
+  User,
+  Music,
+  Pencil,
+  Trash,
+  Calendar,
+  Clock,
+  Search,
+  Loader2,
+} from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -17,13 +28,21 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useArtists, useCreateArtist, useUpdateArtist, useDeleteArtist } from '@/hooks/use-artists';
+import {
+  useArtists,
+  useCreateArtist,
+  useUpdateArtist,
+  useDeleteArtist,
+  useSearchArtists,
+  SearchArtistParams,
+} from '@/hooks/use-artists';
 import { Artist } from '@/types/Artist';
 import { Track } from '@/types/Track';
 import { Textarea } from '@/components/ui/textarea';
 import { formatDuration } from '@/lib/utils';
 import { AudioPlayer } from '@/components/audio-player';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 interface ArtistDetailsProps {
   artist: Artist;
@@ -34,10 +53,13 @@ function ArtistDetails({ artist, onClose }: ArtistDetailsProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedArtist, setEditedArtist] = useState(artist);
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
+  const router = useRouter();
   const updateArtist = useUpdateArtist();
   const deleteArtist = useDeleteArtist();
 
   const handleArtistEdit = async () => {
+    if (updateArtist.isPending) return;
+
     try {
       await updateArtist.mutateAsync({
         id: artist.id,
@@ -53,6 +75,8 @@ function ArtistDetails({ artist, onClose }: ArtistDetailsProps) {
   };
 
   const handleDeleteArtist = async () => {
+    if (deleteArtist.isPending) return;
+
     if (confirm('Êtes-vous sûr de vouloir supprimer cet artiste ?')) {
       try {
         await deleteArtist.mutateAsync(artist.id);
@@ -61,6 +85,11 @@ function ArtistDetails({ artist, onClose }: ArtistDetailsProps) {
         console.error("Erreur lors de la suppression de l'artiste:", error);
       }
     }
+  };
+
+  const handleAlbumClick = (albumId: string) => {
+    onClose();
+    router.push(`/albums?selected=${albumId}`);
   };
 
   const latestAlbums = artist.albums.slice(0, 5);
@@ -72,11 +101,29 @@ function ArtistDetails({ artist, onClose }: ArtistDetailsProps) {
         <DialogTitle className="flex items-center justify-between">
           <span>Détails de l'artiste</span>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={() => setIsEditing(!isEditing)}>
-              <Pencil className="h-4 w-4" />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsEditing(!isEditing)}
+              disabled={updateArtist.isPending || deleteArtist.isPending}
+            >
+              {updateArtist.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Pencil className="h-4 w-4" />
+              )}
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleDeleteArtist}>
-              <Trash className="h-4 w-4 text-destructive" />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleDeleteArtist}
+              disabled={updateArtist.isPending || deleteArtist.isPending}
+            >
+              {deleteArtist.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin text-destructive" />
+              ) : (
+                <Trash className="h-4 w-4 text-destructive" />
+              )}
             </Button>
           </div>
         </DialogTitle>
@@ -136,7 +183,20 @@ function ArtistDetails({ artist, onClose }: ArtistDetailsProps) {
                     className="min-h-[100px]"
                   />
                 </div>
-                <Button onClick={handleArtistEdit}>Enregistrer les modifications</Button>
+                <Button
+                  onClick={handleArtistEdit}
+                  disabled={updateArtist.isPending}
+                  className="mt-4"
+                >
+                  {updateArtist.isPending ? (
+                    <>
+                      <span className="mr-2">Enregistrement...</span>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    </>
+                  ) : (
+                    'Enregistrer les modifications'
+                  )}
+                </Button>
               </div>
             ) : (
               <div>
@@ -169,10 +229,10 @@ function ArtistDetails({ artist, onClose }: ArtistDetailsProps) {
                 {latestAlbums.length > 0 ? (
                   <div className="space-y-2">
                     {latestAlbums.map(album => (
-                      <Link
+                      <button
                         key={album.id}
-                        href={`/albums?id=${album.id}`}
-                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors"
+                        onClick={() => handleAlbumClick(album.id)}
+                        className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors text-left"
                       >
                         <div className="relative w-12 h-12 rounded overflow-hidden bg-muted">
                           {album.coverUrl ? (
@@ -194,7 +254,7 @@ function ArtistDetails({ artist, onClose }: ArtistDetailsProps) {
                             {format(new Date(album.releaseDate), 'dd/MM/yyyy')}
                           </p>
                         </div>
-                      </Link>
+                      </button>
                     ))}
                   </div>
                 ) : (
@@ -251,6 +311,8 @@ export default function ArtistsPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useState<SearchArtistParams>({});
+  const [searchName, setSearchName] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     biography: '',
@@ -258,7 +320,20 @@ export default function ArtistsPage() {
   });
 
   const { data: artists, isLoading: isLoadingArtists } = useArtists();
+  const { data: searchResults, isLoading: isSearching } = useSearchArtists(searchParams);
   const createArtist = useCreateArtist();
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearchParams({
+      name: searchName || undefined,
+    });
+  };
+
+  const resetSearch = () => {
+    setSearchName('');
+    setSearchParams({});
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
@@ -287,6 +362,7 @@ export default function ArtistsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (createArtist.isPending) return;
 
     const submitData = new FormData();
     submitData.append('name', formData.name);
@@ -332,82 +408,120 @@ export default function ArtistsPage() {
     <div className="space-y-4 p-4">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Artistes</h1>
-        <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Ajouter un artiste
+        <div className="flex items-center gap-4">
+          <form onSubmit={handleSearch} className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher un artiste..."
+                value={searchName}
+                onChange={e => setSearchName(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+            <Button type="submit" variant="secondary">
+              Rechercher
             </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Créer un nouvel artiste</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nom</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="biography">Biographie</Label>
-                <Textarea
-                  id="biography"
-                  name="biography"
-                  value={formData.biography}
-                  onChange={handleInputChange}
-                  className="min-h-[100px]"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="image">Photo de l'artiste</Label>
-                <div className="flex flex-col items-center gap-4">
-                  {previewUrl && (
-                    <div className="relative aspect-square w-full max-w-[200px]">
-                      <Image
-                        src={previewUrl}
-                        alt="Prévisualisation"
-                        fill
-                        className="rounded-lg object-cover"
+            {Object.keys(searchParams).length > 0 && (
+              <Button type="button" variant="ghost" onClick={resetSearch}>
+                Réinitialiser
+              </Button>
+            )}
+          </form>
+          <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Ajouter un artiste
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Créer un nouvel artiste</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Nom</Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="biography">Biographie</Label>
+                  <Textarea
+                    id="biography"
+                    name="biography"
+                    value={formData.biography}
+                    onChange={handleInputChange}
+                    className="min-h-[100px]"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="image">Photo de l'artiste</Label>
+                  <div className="flex flex-col items-center gap-4">
+                    {previewUrl && (
+                      <div className="relative aspect-square w-full max-w-[200px]">
+                        <Image
+                          src={previewUrl}
+                          alt="Prévisualisation"
+                          fill
+                          className="rounded-lg object-cover"
+                        />
+                      </div>
+                    )}
+                    <div className="flex w-full items-center gap-2">
+                      <Input
+                        id="image"
+                        name="image"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleInputChange}
+                        className="hidden"
                       />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => document.getElementById('image')?.click()}
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        {formData.image ? "Changer l'image" : 'Sélectionner une image'}
+                      </Button>
                     </div>
-                  )}
-                  <div className="flex w-full items-center gap-2">
-                    <Input
-                      id="image"
-                      name="image"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleInputChange}
-                      className="hidden"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => document.getElementById('image')?.click()}
-                    >
-                      <Upload className="mr-2 h-4 w-4" />
-                      {formData.image ? "Changer l'image" : 'Sélectionner une image'}
-                    </Button>
                   </div>
                 </div>
-              </div>
-              <Button type="submit" className="w-full">
-                Créer l'artiste
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setCreateModalOpen(false)}
+                    disabled={createArtist.isPending}
+                  >
+                    Annuler
+                  </Button>
+                  <Button type="submit" disabled={createArtist.isPending}>
+                    {createArtist.isPending ? (
+                      <>
+                        <span className="mr-2">Création en cours...</span>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      </>
+                    ) : (
+                      "Créer l'artiste"
+                    )}
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {artists.map(artist => (
+        {(searchResults || artists)?.map(artist => (
           <Dialog key={artist.id} onOpenChange={open => open && setSelectedArtist(artist)}>
             <DialogTrigger asChild>
               <Card className="overflow-hidden transition-all hover:shadow-lg cursor-pointer">
