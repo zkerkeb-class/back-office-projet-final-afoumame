@@ -1,0 +1,204 @@
+'use client';
+
+import { useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Music, Clock, Calendar, User, Pencil, Trash, Plus, Loader2, Upload, Search } from 'lucide-react';
+import { formatDuration } from '@/lib/utils';
+import { Track, SearchTrackParams } from '@/types/Track';
+import { useTracks, useUpdateTrack, useDeleteTrack, useCreateTrack, useSearchTracks } from '@/hooks/use-tracks';
+import { cn } from '@/lib/utils';
+import { TrackWaveform } from '@/components/track-waveform';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import Link from 'next/link';
+import { useAlbums } from '@/hooks/use-albums';
+import { useArtists } from '@/hooks/use-artists';
+import { Switch } from '@/components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import Image from 'next/image';
+
+// ... TrackDetails component ...
+
+export default function TracksPage() {
+  const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
+  const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [searchParams, setSearchParams] = useState<SearchTrackParams>({});
+  const [searchTitle, setSearchTitle] = useState('');
+  const [searchArtistId, setSearchArtistId] = useState<string>('');
+  const [searchAlbumId, setSearchAlbumId] = useState<string>('');
+  const [searchIsSingle, setSearchIsSingle] = useState<boolean | undefined>(undefined);
+  const [trackForm, setTrackForm] = useState({
+    title: '',
+    duration: '',
+    artistId: '',
+    albumId: '',
+    audio: null as File | null,
+    cover: null as File | null,
+    isLoading: false,
+    isSingle: true,
+  });
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const { data: tracks, isLoading } = useTracks();
+  const { data: searchResults, isLoading: isSearching } = useSearchTracks(searchParams);
+  const { data: albums } = useAlbums();
+  const { data: artists } = useArtists();
+  const createTrack = useCreateTrack();
+  const updateTrack = useUpdateTrack();
+  const deleteTrack = useDeleteTrack();
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearchParams({
+      title: searchTitle || undefined,
+      artistId: searchArtistId || undefined,
+      albumId: searchAlbumId || undefined,
+      isSingle: searchIsSingle,
+    });
+  };
+
+  const resetSearch = () => {
+    setSearchTitle('');
+    setSearchArtistId('');
+    setSearchAlbumId('');
+    setSearchIsSingle(undefined);
+    setSearchParams({});
+  };
+
+  // ... rest of the existing functions ...
+
+  if (isLoading || isSearching) {
+    return (
+      <div className="space-y-4 p-4">
+        {[...Array(5)].map((_, index) => (
+          <Card key={index}>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-4">
+                <Skeleton className="h-12 w-12 rounded" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-1/4" />
+                  <Skeleton className="h-4 w-1/6" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  if (!tracks || !albums || !artists) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-6 p-4">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Pistes</h1>
+        <div className="flex items-center gap-4">
+          <form onSubmit={handleSearch} className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher une piste..."
+                value={searchTitle}
+                onChange={e => setSearchTitle(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+            <Select value={searchArtistId} onValueChange={setSearchArtistId}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Filtrer par artiste" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Tous les artistes</SelectItem>
+                {artists?.map(artist => (
+                  <SelectItem key={artist.id} value={artist.id}>
+                    {artist.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={searchAlbumId} onValueChange={setSearchAlbumId}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Filtrer par album" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Tous les albums</SelectItem>
+                {albums?.map(album => (
+                  <SelectItem key={album.id} value={album.id}>
+                    {album.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={searchIsSingle === undefined ? '' : searchIsSingle.toString()}
+              onValueChange={value => setSearchIsSingle(value === '' ? undefined : value === 'true')}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Type de piste" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Tous les types</SelectItem>
+                <SelectItem value="true">Singles</SelectItem>
+                <SelectItem value="false">Pistes d'album</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button type="submit" variant="secondary">
+              Rechercher
+            </Button>
+            {Object.keys(searchParams).length > 0 && (
+              <Button type="button" variant="ghost" onClick={resetSearch}>
+                Réinitialiser
+              </Button>
+            )}
+          </form>
+          <Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
+                Ajouter une piste
+              </Button>
+            </DialogTrigger>
+            {/* ... rest of the create dialog ... */}
+          </Dialog>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {(searchResults || tracks)?.map(track => {
+          const album = albums?.find(a => a.id === track.albumId);
+          const artist = artists?.find(a => a.id === track.artistId);
+
+          return (
+            // ... rest of the track rendering code ...
+          );
+        })}
+      </div>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        {selectedTrack && <TrackDetails track={selectedTrack} onClose={handleDialogClose} />}
+      </Dialog>
+    </div>
+  );
+} 
