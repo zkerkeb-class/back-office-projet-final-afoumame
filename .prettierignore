@@ -1,0 +1,9 @@
+dist
+node_modules
+.next
+build
+scripts
+coverage/
+*.md
+*.yml
+*.yaml
